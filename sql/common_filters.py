@@ -13,32 +13,133 @@ INNER JOIN Dim_Causa ca
 """
 
 
-def construir_filtros(anio=None, provincias=None, cantones=None, clases=None, causas=None):
+def construir_filtros(
+    anio=None,
+    provincias=None,
+    cantones=None,
+    clases=None,
+    causas=None
+):
 
     filtros = []
-    parametros = []
+    parametros = {}
+
+
+    # ======================
+    # Año
+    # ======================
 
     if anio not in (None, "Todos"):
-        filtros.append("t.anio = ?")
-        parametros.append(anio)
+
+        filtros.append(
+            "t.anio = :anio"
+        )
+
+        parametros["anio"] = int(anio)
+
+
+    # ======================
+    # Provincias
+    # ======================
 
     if provincias:
-        filtros.append(f"u.provincia IN ({', '.join('?' for _ in provincias)})")
-        parametros.extend(provincias)
+
+        nombres = []
+
+        for i, provincia in enumerate(provincias):
+
+            nombre = f"provincia_{i}"
+
+            nombres.append(
+                f":{nombre}"
+            )
+
+            parametros[nombre] = provincia
+
+
+        filtros.append(
+            f"u.provincia IN ({','.join(nombres)})"
+        )
+
+
+    # ======================
+    # Cantones
+    # ======================
 
     if cantones:
-        filtros.append(f"u.canton IN ({', '.join('?' for _ in cantones)})")
-        parametros.extend(cantones)
+
+        nombres = []
+
+        for i, canton in enumerate(cantones):
+
+            nombre = f"canton_{i}"
+
+            nombres.append(
+                f":{nombre}"
+            )
+
+            parametros[nombre] = canton
+
+
+        filtros.append(
+            f"u.canton IN ({','.join(nombres)})"
+        )
+
+
+    # ======================
+    # Clases
+    # ======================
 
     if clases:
-        filtros.append(f"c.clase IN ({', '.join('?' for _ in clases)})")
-        parametros.extend(clases)
+
+        nombres = []
+
+        for i, clase in enumerate(clases):
+
+            nombre = f"clase_{i}"
+
+            nombres.append(
+                f":{nombre}"
+            )
+
+            parametros[nombre] = clase
+
+
+        filtros.append(
+            f"c.clase IN ({','.join(nombres)})"
+        )
+
+
+    # ======================
+    # Causas
+    # ======================
 
     if causas:
-        filtros.append(f"ca.causa IN ({', '.join('?' for _ in causas)})")
-        parametros.extend(causas)
+
+        nombres = []
+
+        for i, causa in enumerate(causas):
+
+            nombre = f"causa_{i}"
+
+            nombres.append(
+                f":{nombre}"
+            )
+
+            parametros[nombre] = causa
+
+
+        filtros.append(
+            f"ca.causa IN ({','.join(nombres)})"
+        )
+
 
     if filtros:
-        return "WHERE " + " AND ".join(filtros), parametros
+
+        return (
+            "WHERE " + " AND ".join(filtros),
+            parametros
+        )
+
 
     return "", parametros
