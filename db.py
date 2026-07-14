@@ -1,39 +1,51 @@
-import pyodbc
 import pandas as pd
 import streamlit as st
 
-from config import *
+from sqlalchemy import create_engine, text
+from urllib.parse import quote_plus
+
+from config import SERVER, DATABASE, USERNAME, PASSWORD
 
 
+@st.cache_resource
 def get_connection():
 
-    conn = pyodbc.connect(
-        f"DRIVER={{{DRIVER}}};"
-        f"SERVER={SERVER};"
-        f"DATABASE={DATABASE};"
-        f"UID={USERNAME};"
-        f"PWD={PASSWORD};"
-        "TrustServerCertificate=yes;"
+    connection_string = (
+        f"mssql+pymssql://{USERNAME}:{quote_plus(PASSWORD)}"
+        f"@{SERVER}:1433/{DATABASE}"
     )
 
-    return conn
+    engine = create_engine(
+        connection_string,
+        pool_pre_ping=True
+    )
+
+    return engine
 
 
 @st.cache_data(ttl=300, max_entries=128, show_spinner=False)
 def ejecutar_consulta(sql, params=None):
 
-    conn = get_connection()
+    engine = get_connection()
 
     try:
-        cursor = conn.cursor()
-        cursor.execute(sql, tuple(params or ()))
+        with engine.connect() as conn:
 
-        if cursor.description is None:
-            return pd.DataFrame()
+            if params:
+                result = conn.execute(
+                    text(sql),
+                    params
+                )
+            else:
+                result = conn.execute(
+                    text(sql)
+                )
 
-        columns = [column[0] for column in cursor.description]
-        rows = cursor.fetchall()
+            return pd.DataFrame(
+                result.fetchall(),
+                columns=result.keys()
+            )
 
-        return pd.DataFrame.from_records(rows, columns=columns)
-    finally:
-        conn.close()
+    except Exception as e:
+        st.error(f"Error de conexión a la base de datos: {e}")
+        return pd.DataFrame()
