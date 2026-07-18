@@ -242,6 +242,61 @@ def generate_sql(
     )
 
 
+def _is_garbled_text(text: str) -> bool:
+    """
+    Detecta si el texto generado por el LLM es basura ilegible.
+
+    Heurísticas:
+    - Contiene <unk> (token desconocido)
+    - Contiene palabras excesivamente largas (>30 chars) sin espacios
+    - La proporción de caracteres no-alfabéticos es muy alta
+    """
+    if "<unk>" in text:
+        return True
+
+    words = text.split()
+    for w in words:
+        if len(w) > 30:
+            return True
+
+    if len(text) > 0:
+        alpha = sum(1 for c in text if c.isalpha() or c.isspace())
+        ratio = alpha / len(text)
+        if ratio < 0.5:
+            return True
+
+    return False
+
+
+def _fallback_explanation(
+    question: str,
+    result_preview: str,
+    row_count: int,
+) -> str:
+    """Genera una explicación de respaldo sin usar el LLM."""
+    lines = [l for l in result_preview.strip().split("\n") if l.strip()]
+    if not lines:
+        return "No se encontraron datos para tu consulta."
+
+    header = lines[0]
+    columns = [c.strip() for c in header.split() if c.strip()]
+
+    if row_count == 0:
+        return "La consulta no devolvió filas."
+
+    summary = (
+        f"Se obtuvieron {row_count} registro(s) con los siguientes "
+        f"campos: {', '.join(columns[:6])}"
+        f"{' y más.' if len(columns) > 6 else '.'}"
+    )
+
+    first_row = lines[1].split() if len(lines) > 1 else []
+    if first_row and len(first_row) > 0:
+        summary += f" El primer valor es {first_row[0]}."
+
+    return summary
+
+
 def generate_explanation(
     question: str,
     sql: str,
@@ -250,6 +305,9 @@ def generate_explanation(
 ) -> str:
     """
     Genera una explicación en lenguaje natural de los resultados.
+
+    Si el LLM devuelve texto corrupto/ilegible, se usa una explicación
+    de respaldo basada en los datos.
     """
     system_prompt = _load_prompt(_EXPLANATION_PROMPT_PATH)
     user_content = (
@@ -261,4 +319,11 @@ def generate_explanation(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
-    return chat_completion(messages, model=model, temperature=0.3, max_tokens=600)
+    raw = chat_completion(messages, model=model, temperature=0.3, max_tokens=600)
+
+    if _is_garbled_text(raw):
+        row_count = len(result_preview.strip().split("\n")) - 1  # restar header
+        row_count = max(row_count, 0)
+        return _fallback_explanation(question, result_preview, row_count)
+
+    return raw

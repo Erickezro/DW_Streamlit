@@ -84,9 +84,16 @@ def _render_result_block(entry: dict[str, Any]) -> None:
         st.warning("La consulta no devolvió filas.")
 
 
-def _process_question(question: str) -> dict[str, Any]:
+def _process_question(question: str, status=None) -> dict[str, Any]:
     """
     Pipeline completo: pregunta → SQL → validación → ejecución → explicación.
+
+    Parameters
+    ----------
+    question : str
+        Pregunta del usuario.
+    status : st.delta_generator.DeltaGenerator, optional
+        Objeto st.status() para mostrar progreso en tiempo real.
     """
     model_id = _selected_model_id()
     entry: dict[str, Any] = {
@@ -103,11 +110,15 @@ def _process_question(question: str) -> dict[str, Any]:
     }
 
     try:
+        if status:
+            status.write("🧠 **Generando SQL** a partir de tu pregunta...")
         gen = generate_sql(question, model=model_id)
         entry["sql"] = gen.sql
         entry["chart_hint"] = gen.chart_hint
         entry["reasoning"] = gen.reasoning
 
+        if status:
+            status.write("🔍 **Validando** la consulta SQL...")
         validation = validate_sql(gen.sql)
         if not validation.is_valid:
             entry["error"] = f"SQL rechazado por seguridad: {validation.error}"
@@ -115,8 +126,12 @@ def _process_question(question: str) -> dict[str, Any]:
                 "No pude ejecutar la consulta porque el SQL generado "
                 "no superó las validaciones de seguridad (solo se permiten SELECT)."
             )
+            if status:
+                status.update(label="❌ SQL rechazado", state="error")
             return entry
 
+        if status:
+            status.write("⚡ **Ejecutando** la consulta en Azure SQL...")
         execution = execute_readonly_sql(validation.sql)
         entry["sql"] = execution.sql
         entry["dataframe"] = execution.dataframe
@@ -127,8 +142,12 @@ def _process_question(question: str) -> dict[str, Any]:
                 "La consulta se generó, pero falló al ejecutarse en Azure SQL. "
                 f"Detalle: {execution.error}"
             )
+            if status:
+                status.update(label="❌ Error en BD", state="error")
             return entry
 
+        if status:
+            status.write("📝 **Preparando explicación** de los resultados...")
         preview = dataframe_preview_for_llm(execution.dataframe)
         entry["explanation"] = generate_explanation(
             question=question,
@@ -137,15 +156,21 @@ def _process_question(question: str) -> dict[str, Any]:
             model=model_id,
         )
         entry["success"] = True
+        if status:
+            status.update(label="✅ Respuesta lista", state="complete", expanded=False)
         return entry
 
     except LLMError as exc:
         entry["error"] = str(exc)
         entry["explanation"] = f"Error del modelo LLM: {exc}"
+        if status:
+            status.update(label="❌ Error del modelo", state="error")
         return entry
     except Exception as exc:  # noqa: BLE001
         entry["error"] = str(exc)
         entry["explanation"] = f"Error inesperado en el asistente: {exc}"
+        if status:
+            status.update(label="❌ Error inesperado", state="error")
         return entry
 
 
@@ -249,8 +274,8 @@ if question:
             st.markdown(question)
 
         with st.chat_message("assistant", avatar=":material/smart_toy:"):
-            with st.spinner("Generando SQL, consultando Azure SQL y preparando la respuesta…"):
-                entry = _process_question(question)
+            with st.status("Iniciando...", expanded=True) as status:
+                entry = _process_question(question, status=status)
             _render_result_block(entry)
 
         st.session_state[HISTORY_KEY].append(entry)
