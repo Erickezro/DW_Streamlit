@@ -188,7 +188,7 @@ if not is_llm_configured():
         "Falta configurar **OPENROUTER_API_KEY** en `.streamlit/secrets.toml`.\n\n"
         "Ejemplo:\n"
         "```toml\nOPENROUTER_API_KEY = \"sk-or-...\"\n"
-        "LLM_MODEL = \"deepseek/deepseek-chat\"\n```"
+        "LLM_MODEL = \"qwen/qwen3-coder:free\"\n```"
     )
     st.stop()
 

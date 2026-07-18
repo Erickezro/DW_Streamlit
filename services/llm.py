@@ -69,7 +69,7 @@ def chat_completion(
     messages : list[dict]
         Lista de mensajes con roles 'system', 'user', 'assistant'.
     model : str, optional
-        ID del modelo en OpenRouter (ej. 'deepseek/deepseek-chat').
+        ID del modelo en OpenRouter (ej. 'qwen/qwen3-coder:free').
     temperature : float, optional
         Creatividad del modelo (bajo = más determinista para SQL).
     max_tokens : int, optional
