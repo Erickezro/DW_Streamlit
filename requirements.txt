@@ -4,3 +4,4 @@ numpy==2.5.1
 plotly==6.9.0
 sqlalchemy
 pymssql
+openai>=1.40.0

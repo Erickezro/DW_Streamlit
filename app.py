@@ -21,7 +21,12 @@ page = st.navigation(
         st.Page("pages/2_📈_Análisis_Temporal.py", title="Análisis de Accidentes en el Tiempo", icon="📈"),
         st.Page("pages/3_🗺️_Análisis_Geográfico.py", title="Análisis Geográfico", icon="🗺️"),
         st.Page("pages/4_🔎_Consultas.py", title="Consultas", icon="🔎"),
-        st.Page("pages/5_ℹ️_Acerca_del_DW.py", title="Acerca del DW", icon="ℹ️")
+        st.Page("pages/5_ℹ️_Acerca_del_DW.py", title="Acerca del DW", icon="ℹ️"),
+        st.Page(
+            "pages/6_🤖_Asistente.py",
+            title="Asistente Inteligente",
+            icon=":material/smart_toy:",
+        ),
     ],
     position="sidebar",
 )
