@@ -24,17 +24,17 @@ OPENROUTER_APP_NAME = st.secrets.get("OPENROUTER_APP_NAME", "DW Accidentes Ecuad
 # Catálogo actualizado desde https://openrouter.ai/models?max_price=0
 # Para agregar o quitar, edita este diccionario (solo IDs con :free o openrouter/free).
 LLM_MODELS = {
+    "OpenRouter Free Router": "openrouter/free",
     "Qwen3 Coder (free)": "qwen/qwen3-coder:free",
     "Qwen3 Next 80B (free)": "qwen/qwen3-next-80b-a3b-instruct:free",
     "Llama 3.3 70B (free)": "meta-llama/llama-3.3-70b-instruct:free",
     "Gemma 4 31B (free)": "google/gemma-4-31b-it:free",
     "GPT-OSS 20B (free)": "openai/gpt-oss-20b:free",
     "Nemotron Nano 30B (free)": "nvidia/nemotron-3-nano-30b-a3b:free",
-    "OpenRouter Free Router": "openrouter/free",
 }
 
 # Modelo por defecto (gratuito). Puede sobreescribirse en secrets con LLM_MODEL.
-DEFAULT_LLM_MODEL = st.secrets.get("LLM_MODEL", "qwen/qwen3-coder:free")
+DEFAULT_LLM_MODEL = st.secrets.get("LLM_MODEL", "openrouter/free")
 
 # Parámetros de generación
 LLM_TEMPERATURE = float(st.secrets.get("LLM_TEMPERATURE", 0.1))

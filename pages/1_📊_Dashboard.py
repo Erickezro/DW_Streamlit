@@ -16,10 +16,19 @@ from sql.dashboard import (
     query_top_causas,
     query_top_provincias,
 )
+from utils.insights import (
+    interpret_kpis,
+    interpret_tendencia_anual,
+    interpret_provincias,
+    interpret_causas,
+    interpret_clases,
+    interpret_zonas,
+    sabias_que,
+    recomendacion_aleatoria,
+)
 
 
 def filtros_globales():
-
     return {
         "anio": st.session_state.get("filtro_anio", "Todos"),
         "provincias": st.session_state.get("filtro_provincias", []),
@@ -28,24 +37,46 @@ def filtros_globales():
         "causas": st.session_state.get("filtro_causas", []),
     }
 
+
+# ====================================================
+# HERO
+# ====================================================
 st.title("📊 Panorama de la Seguridad Vial en Ecuador")
-st.markdown(
-    """
-    Bienvenido a este panel informativo. Aquí puedes explorar los datos sobre la accidentabilidad vial en Ecuador. 
-    El objetivo es facilitar la comprensión de las tendencias y los factores críticos que impactan en la seguridad en nuestras vías.
-    """
-)
+
+with st.container(border=True):
+    st.markdown(
+        """
+        ### La seguridad vial es un compromiso de todos
+
+        Bienvenido al observatorio ciudadano de siniestralidad vial del Ecuador.
+        Aquí puedes explorar los datos reales de accidentes de tránsito registrados en el país,
+        entender las causas, identificar los patrones de riesgo y, sobre todo,
+        **tomar conciencia para prevenir**.
+
+        Los datos presentados provienen del Data Warehouse de Accidentes de Tránsito del Ecuador
+        y se actualizan periódicamente. Utiliza los filtros de la barra lateral para personalizar
+        tu análisis.
+        """
+    )
+
+st.divider()
 
 filtros = filtros_globales()
+
+# ====================================================
+# ¿SABÍAS QUE...?
+# ====================================================
+with st.container(border=True):
+    col_sq, _ = st.columns([6, 2])
+    with col_sq:
+        st.markdown(f"💡 **¿Sabías que…?**  \n{sabias_que()}")
 
 st.divider()
 
 # ====================================================
-# KPIs
+# KPIs + INTERPRETACIÓN
 # ====================================================
-
 st.subheader("💡 Resumen del Impacto")
-st.markdown("Principales indicadores de siniestralidad según los filtros seleccionados.")
 
 kpi = ejecutar_consulta(
     *query_kpis(
@@ -59,7 +90,6 @@ kpi = ejecutar_consulta(
 
 fila_kpi = kpi.iloc[0] if not kpi.empty else {"accidentes": 0, "fallecidos": 0, "lesionados": 0, "victimas": 0}
 
-# --- Tendencia: comparar con año anterior ---
 anio_comparacion = None
 if filtros["anio"] != "Todos":
     anio_comparacion = int(filtros["anio"]) - 1
@@ -140,18 +170,30 @@ with col4:
 st.caption(
     f"Los deltas muestran la variación porcentual respecto al año anterior."
     if delta_accidentes is not None
-    else "Seleccione un año específico en los filtros para ver la tendencia."
+    else "Selecciona un año específico en los filtros para ver la tendencia."
 )
+
+# Interpretación de KPIs
+if fila_kpi.get("accidentes", 0) > 0:
+    with st.container(border=True):
+        st.markdown("**📝 Interpretación**")
+        st.markdown(
+            interpret_kpis(
+                accidentes=fila_kpi["accidentes"],
+                fallecidos=fila_kpi["fallecidos"],
+                lesionados=fila_kpi["lesionados"],
+                delta_acc=delta_accidentes,
+            )
+        )
 
 st.divider()
 
 # ====================================================
-# Tendencias
+# TENDENCIA ANUAL
 # ====================================================
-
 st.subheader("📈 Evolución en el tiempo")
 
-df = ejecutar_consulta(
+df_anio = ejecutar_consulta(
     *query_accidentes_por_anio(
         anio=filtros["anio"],
         provincias=filtros["provincias"],
@@ -162,35 +204,46 @@ df = ejecutar_consulta(
 )
 
 fig = px.bar(
-    df,
+    df_anio,
     x="anio",
     y="accidentes",
     text="accidentes",
-    title="¿Cómo ha cambiado la cantidad de accidentes por año?"
+    title="¿Cómo ha cambiado la cantidad de accidentes por año?",
+    color_discrete_sequence=["#e74c3c"],
 )
 
 fig.update_layout(
     xaxis_title="Año",
-    yaxis_title="Accidentes"
+    yaxis_title="Accidentes",
 )
 
 st.plotly_chart(fig, width="stretch")
 
+if not df_anio.empty:
+    with st.container(border=True):
+        st.markdown("**📝 Interpretación**")
+        st.markdown(interpret_tendencia_anual(df_anio))
+
 st.divider()
 
 # ====================================================
-# Geografía y Causas
+# ¿Sabías que...? (segundo)
 # ====================================================
+with st.container(border=True):
+    col_sq2, _ = st.columns([6, 2])
+    with col_sq2:
+        st.markdown(f"💡 **¿Sabías que…?**  \n{sabias_que()}")
 
+st.divider()
+
+# ====================================================
+# FOCO GEOGRÁFICO Y CAUSAS
+# ====================================================
 st.subheader("📍 Foco Geográfico y Causas Principales")
 col1, col2 = st.columns(2)
 
-# -------------------------
-# Top provincias
-# -------------------------
-
 with col1:
-    df = ejecutar_consulta(
+    df_prov = ejecutar_consulta(
         *query_top_provincias(
             anio=filtros["anio"],
             provincias=filtros["provincias"],
@@ -201,26 +254,25 @@ with col1:
     )
 
     fig = px.bar(
-        df,
+        df_prov,
         x="accidentes",
         y="provincia",
         orientation="h",
         text="accidentes",
-        title="¿Dónde ocurren más accidentes?"
+        title="¿Dónde ocurren más accidentes?",
+        color_discrete_sequence=["#e67e22"],
     )
 
-    fig.update_layout(
-        yaxis={'categoryorder': 'total ascending'}
-    )
-
+    fig.update_layout(yaxis={"categoryorder": "total ascending"})
     st.plotly_chart(fig, width="stretch")
 
-# -------------------------
-# Top causas
-# -------------------------
+    if not df_prov.empty:
+        with st.container(border=True):
+            st.markdown("**📝 Interpretación**")
+            st.markdown(interpret_provincias(df_prov))
 
 with col2:
-    df = ejecutar_consulta(
+    df_causas = ejecutar_consulta(
         *query_top_causas(
             anio=filtros["anio"],
             provincias=filtros["provincias"],
@@ -231,35 +283,34 @@ with col2:
     )
 
     fig = px.bar(
-        df,
+        df_causas,
         x="accidentes",
         y="causa",
         orientation="h",
         text="accidentes",
-        title="¿Cuáles son las causas principales?"
+        title="¿Cuáles son las causas principales?",
+        color_discrete_sequence=["#c0392b"],
     )
 
-    fig.update_layout(
-        yaxis={'categoryorder': 'total ascending'}
-    )
-
+    fig.update_layout(yaxis={"categoryorder": "total ascending"})
     st.plotly_chart(fig, width="stretch")
 
-# ====================================================
-# Contexto adicional
-# ====================================================
+    if not df_causas.empty:
+        with st.container(border=True):
+            st.markdown("**📝 Interpretación**")
+            st.markdown(interpret_causas(df_causas))
 
 st.divider()
+
+# ====================================================
+# DETALLES ADICIONALES
+# ====================================================
 st.subheader("🧐 Detalles adicionales")
 
 col1, col2 = st.columns(2)
 
-# -------------------------
-# Accidentes por clase
-# -------------------------
-
 with col1:
-    df = ejecutar_consulta(
+    df_clase = ejecutar_consulta(
         *query_accidentes_por_clase(
             anio=filtros["anio"],
             provincias=filtros["provincias"],
@@ -270,20 +321,23 @@ with col1:
     )
 
     fig = px.pie(
-        df,
+        df_clase,
         names="clase",
         values="accidentes",
-        title="¿Qué tipo de accidentes predominan?"
+        title="¿Qué tipo de accidentes predominan?",
+        hole=0.35,
+        color_discrete_sequence=px.colors.qualitative.Set3,
     )
 
     st.plotly_chart(fig, width="stretch")
 
-# -------------------------
-# Accidentes por zona
-# -------------------------
+    if not df_clase.empty:
+        with st.container(border=True):
+            st.markdown("**📝 Interpretación**")
+            st.markdown(interpret_clases(df_clase))
 
 with col2:
-    df = ejecutar_consulta(
+    df_zona = ejecutar_consulta(
         *query_accidentes_por_zona(
             anio=filtros["anio"],
             provincias=filtros["provincias"],
@@ -294,11 +348,33 @@ with col2:
     )
 
     fig = px.bar(
-        df,
+        df_zona,
         x="zona",
         y="accidentes",
         text="accidentes",
-        title="¿En qué zonas (Urbana/Rural) ocurren?"
+        title="¿En qué zonas (Urbana/Rural) ocurren?",
+        color_discrete_sequence=["#3498db", "#2ecc71"],
     )
 
     st.plotly_chart(fig, width="stretch")
+
+    if not df_zona.empty:
+        with st.container(border=True):
+            st.markdown("**📝 Interpretación**")
+            st.markdown(interpret_zonas(df_zona))
+
+st.divider()
+
+# ====================================================
+# RECOMENDACIÓN PREVENTIVA
+# ====================================================
+with st.container(border=True):
+    col_rec, _ = st.columns([5, 1])
+    with col_rec:
+        st.markdown("🛡️ **Recomendación para hoy**")
+        st.markdown(recomendacion_aleatoria())
+
+st.caption(
+    "Fuente: Data Warehouse de Accidentes de Tránsito del Ecuador. "
+    "Los datos reflejan la información disponible en el sistema."
+)

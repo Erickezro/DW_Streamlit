@@ -2,11 +2,11 @@
 Página: Asistente Inteligente (Text-to-SQL).
 
 Flujo de la UI:
-1. El usuario escribe una pregunta en lenguaje natural.
+1. El usuario escribe una pregunta o selecciona una sugerencia.
 2. El LLM genera SQL de solo lectura.
 3. Se valida y ejecuta en Azure SQL.
 4. El LLM explica los resultados.
-5. Streamlit muestra explicación + tabla + gráfico.
+5. Streamlit muestra explicación + tabla + gráfico + recomendación.
 6. El historial de la sesión se guarda en st.session_state.
 """
 
@@ -22,6 +22,7 @@ from services.charts import build_chart
 from services.llm import LLMError, is_llm_configured
 from services.sql_executor import dataframe_preview_for_llm, execute_readonly_sql
 from services.sql_generator import generate_explanation, generate_sql, validate_sql
+from utils.insights import SUGERENCIAS_ASISTENTE, recomendacion_aleatoria
 
 # ---------------------------------------------------------------------------
 # Estado de sesión
@@ -35,7 +36,6 @@ def _init_state() -> None:
     if HISTORY_KEY not in st.session_state:
         st.session_state[HISTORY_KEY] = []
     if MODEL_KEY not in st.session_state:
-        # Resolver etiqueta a partir del id por defecto
         default_label = next(
             (label for label, mid in LLM_MODELS.items() if mid == DEFAULT_LLM_MODEL),
             next(iter(LLM_MODELS)),
@@ -51,7 +51,7 @@ def _selected_model_id() -> str:
 
 
 def _render_result_block(entry: dict[str, Any]) -> None:
-    """Renderiza explicación, SQL, tabla y gráfico de una respuesta."""
+    """Renderiza explicación, SQL, tabla, gráfico y recomendación."""
     st.markdown(entry.get("explanation") or "_Sin explicación_")
 
     with st.expander("Ver SQL generado", expanded=False):
@@ -67,8 +67,6 @@ def _render_result_block(entry: dict[str, Any]) -> None:
             st.dataframe(df, width="stretch", hide_index=True)
         with col_chart:
             st.markdown("**Visualización**")
-            # Se reconstruye en cada rerun (los Figure de Plotly
-            # no siempre se serializan bien en session_state).
             fig = build_chart(
                 df,
                 chart_hint=entry.get("chart_hint", "table"),
@@ -78,6 +76,12 @@ def _render_result_block(entry: dict[str, Any]) -> None:
                 st.plotly_chart(fig, width="stretch")
             else:
                 st.info("No se pudo generar un gráfico automático para este resultado.")
+
+        # Recomendación preventiva
+        with st.container(border=True):
+            st.markdown("🛡️ **Recomendación preventiva**")
+            st.markdown(recomendacion_aleatoria())
+
     elif entry.get("error"):
         st.error(entry["error"])
     else:
@@ -85,16 +89,7 @@ def _render_result_block(entry: dict[str, Any]) -> None:
 
 
 def _process_question(question: str, status=None) -> dict[str, Any]:
-    """
-    Pipeline completo: pregunta → SQL → validación → ejecución → explicación.
-
-    Parameters
-    ----------
-    question : str
-        Pregunta del usuario.
-    status : st.delta_generator.DeltaGenerator, optional
-        Objeto st.status() para mostrar progreso en tiempo real.
-    """
+    """Pipeline completo: pregunta → SQL → validación → ejecución → explicación."""
     model_id = _selected_model_id()
     entry: dict[str, Any] = {
         "timestamp": datetime.now().isoformat(timespec="seconds"),
@@ -179,26 +174,28 @@ def _process_question(question: str, status=None) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 _init_state()
 
-st.title("Asistente inteligente")
-st.markdown(
-    """
-Pregunta en lenguaje natural sobre el Data Warehouse de accidentes de tránsito en Ecuador.
-El sistema genera SQL de solo lectura, lo ejecuta en Azure SQL y te muestra una explicación,
-una tabla y un gráfico automático.
+st.title("🤖 Asistente Inteligente")
 
-**No necesitas escribir SQL.**
-"""
-)
+with st.container(border=True):
+    st.markdown(
+        """
+        Pregunta en lenguaje natural sobre los accidentes de tránsito en Ecuador.
+        El asistente genera automáticamente la consulta SQL, la ejecuta en la base de datos
+        y te devuelve una **explicación**, una **tabla** y un **gráfico**.
 
-# ---- Sidebar de la página (modelo + ejemplos) ----
+        **No necesitas saber SQL.** Solo escribe tu pregunta en español.
+        """
+    )
+
+# ---- Sidebar de la página ----
 with st.sidebar:
     st.divider()
-    st.subheader("Asistente")
+    st.subheader("🤖 Asistente")
     st.selectbox(
         "Modelo LLM (OpenRouter)",
         options=list(LLM_MODELS.keys()),
         key=MODEL_KEY,
-        help="Cambia el modelo sin tocar el código. Los IDs se definen en config.py.",
+        help="Cambia el modelo sin tocar el código.",
     )
     st.caption(f"ID: `{_selected_model_id()}`")
 
@@ -217,27 +214,27 @@ if not is_llm_configured():
     )
     st.stop()
 
-# ---- Sugerencias iniciales ----
-SUGGESTIONS = [
-    "¿Qué provincia tuvo más accidentes en 2023?",
-    "¿Cuáles son las causas más frecuentes?",
-    "¿En qué meses ocurren más accidentes?",
-    "¿Cuántos accidentes hubo en Quito durante 2022?",
-    "Muéstrame los accidentes por clase",
-    "Compara Guayas y Pichincha",
-]
-
+# ---- Sugerencias categorizadas ----
 if not st.session_state[HISTORY_KEY]:
-    st.markdown("#### Prueba con una pregunta")
-    selected = st.pills(
-        "Sugerencias",
-        options=SUGGESTIONS,
-        selection_mode="single",
-        label_visibility="collapsed",
-    )
-    if selected:
-        st.session_state[PENDING_KEY] = selected
-        st.rerun()
+    st.markdown("#### 💡 Prueba con una pregunta")
+    st.markdown("Selecciona una categoría y luego una pregunta:")
+
+    tabs_sug = st.tabs(list(SUGERENCIAS_ASISTENTE.keys()))
+    cat_keys = list(SUGERENCIAS_ASISTENTE.keys())
+
+    for tab_idx, (cat_name, preguntas) in enumerate(SUGERENCIAS_ASISTENTE.items()):
+        with tabs_sug[tab_idx]:
+            cols = st.columns(2)
+            for i, pregunta in enumerate(preguntas):
+                with cols[i % 2]:
+                    if st.button(
+                        pregunta,
+                        key=f"sug_{tab_idx}_{i}",
+                        use_container_width=True,
+                        type="tertiary",
+                    ):
+                        st.session_state[PENDING_KEY] = pregunta
+                        st.rerun()
 
 # ---- Historial de la sesión ----
 history: list[dict[str, Any]] = st.session_state[HISTORY_KEY]
@@ -247,7 +244,6 @@ for idx, entry in enumerate(history):
         st.markdown(entry["question"])
     with st.chat_message("assistant", avatar=":material/smart_toy:"):
         _render_result_block(entry)
-        # Reconsultar esta pregunta
         if st.button(
             "Volver a consultar",
             key=f"replay_{idx}_{entry.get('timestamp', idx)}",
@@ -262,7 +258,6 @@ prompt = st.chat_input(
     submit_mode="disable",
 )
 
-# Prioridad: pregunta pendiente (sugerencia o reconsulta) o chat_input
 question = st.session_state[PENDING_KEY] or prompt
 if st.session_state[PENDING_KEY]:
     st.session_state[PENDING_KEY] = None
@@ -279,5 +274,4 @@ if question:
             _render_result_block(entry)
 
         st.session_state[HISTORY_KEY].append(entry)
-        # Evitar reprocesar el mismo prompt en el siguiente rerun accidental
         st.rerun()
