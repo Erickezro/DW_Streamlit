@@ -199,12 +199,11 @@ if not df_mes.empty and not df_dia.empty and not df_hora.empty:
     with tab_horas:
         max_acc = df_hora["accidentes"].max()
         st.markdown("**Horas con mayor riesgo**")
-        # Mostrar horas más relevantes (mañana 6-9, tarde 12-14, noche 17-21)
         horas_mostrar = df_hora[df_hora["cod_hora"].between(6, 21)]
         if horas_mostrar.empty:
             horas_mostrar = df_hora.head(12)
         for _, r in horas_mostrar.iterrows():
-            hora_label = f"{int(r['hora'])}:00" if r["hora"] == r["hora"] else str(r["hora"])
+            hora_label = str(r.get("hora", r.get("cod_hora", "")))
             st.markdown(barra_riesgo_html(r["accidentes"], max_acc, hora_label), unsafe_allow_html=True)
 
 st.divider()

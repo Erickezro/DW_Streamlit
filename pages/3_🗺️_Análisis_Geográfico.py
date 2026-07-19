@@ -112,14 +112,14 @@ if not filtros["provincias"]:
     )
     if not df_todas.empty:
         geojson_ec = obtener_geojson_mapa(df_todas)
-        fig = px.choropleth_mapbox(
+        fig = px.choropleth_map(
             df_todas,
             geojson=geojson_ec,
             locations="provincia",
             featureidkey="properties.shapeName_db",
             color="accidentes",
             color_continuous_scale="OrRd",
-            mapbox_style="carto-positron",
+            map_style="carto-positron",
             zoom=5,
             center={"lat": -1.5, "lon": -78.5},
             opacity=0.7,
@@ -239,14 +239,14 @@ with col_mapa:
     )
 
     geojson_ec = obtener_geojson_mapa(df_provincias_filtrado)
-    fig = px.choropleth_mapbox(
+    fig = px.choropleth_map(
         df_provincias_filtrado,
         geojson=geojson_ec,
         locations="provincia",
         featureidkey="properties.shapeName_db",
         color="accidentes",
         color_continuous_scale="OrRd",
-        mapbox_style="carto-positron",
+        map_style="carto-positron",
         zoom=5.5,
         center={"lat": -1.5, "lon": -78.5},
         opacity=0.7,

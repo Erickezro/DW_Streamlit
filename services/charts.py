@@ -179,14 +179,14 @@ def build_chart(
             if geojson is None:
                 chart_type = "bar"
             else:
-                fig = px.choropleth_mapbox(
+                fig = px.choropleth_map(
                     df,
                     geojson=geojson,
                     locations=provincia_col,
                     featureidkey="properties.shapeName_db",
                     color=y_col,
                     color_continuous_scale="OrRd",
-                    mapbox_style="carto-positron",
+                    map_style="carto-positron",
                     zoom=5,
                     center={"lat": -1.5, "lon": -78.5},
                     opacity=0.75,
